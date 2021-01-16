@@ -131,8 +131,8 @@ while a < a_0:
         t = t + dt
         #progressing timestep and updating values
     ######################################################
-    
-print('wowweee')
+
+
 mplt.plot(array_a, array_phi)
 mplt.xlabel('Scale Factor, a')
 mplt.ylabel('Phi')
