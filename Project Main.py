@@ -21,7 +21,7 @@ a_0 = 1                     #Present scale factor
 #lambdo = 5                 #Model parameter
 z_i = 20                    #Initial redshift
 z_c = 10                    #Redshift at crossover
-eta = 0.5                     #Model parameter after crossover
+eta = 0.5                   #Model parameter after crossover
 ##########################################################
 
 ################# Derived parameters #####################
@@ -59,14 +59,18 @@ dt = 0.001 * t
 array_a = []
 array_phi = []
 array_H = []
-array_omega = []
+array_barotropic_parameter = []
 array_physical_distance = []
 array_luminosity_distance = []
 ##########################################################
 
 ############### Functions for Integrals ##################
-def physical_distance(a):
-    return 1/(H * a**2)
+#def physical_distance(a):
+    #return 1/(H * a**2)
+def barotropic_integrand(a):
+    return (3/a)*(1 + barotropic_parameter)
+def physical_distance_integrand(a):
+    return (1/a**2)*(Omega_m0 * a**(-3) + Omega_de0 * np.exp(1*integrate.quad(barotropic_integrand, 1, a)[0]))**(-1/2)
 ##########################################################
 
 
@@ -78,8 +82,9 @@ while a < a_0:
         energy_density_phi = x**2 /2 + scalar_potential
         pressure_phi = x**2 /2 - scalar_potential
         energy_density_m = (a_0/a)**3 * rho_m0
+        barotropic_parameter = pressure_phi/energy_density_phi
         H = ((energy_density_m+energy_density_phi)/(3*M_pl_2))**(1/2)
-        d_z = integrate.quad(physical_distance, a, 1)
+        d_z = integrate.quad(physical_distance_integrand, a, 1)
         d_L = (1/a) * d_z[0] 
         #calculating values from inputs, these will be used to update the infintesimals
 
@@ -90,7 +95,7 @@ while a < a_0:
 
         array_a.append(a)
         array_phi.append(phi)
-        array_omega.append(pressure_phi/energy_density_phi)
+        array_barotropic_parameter.append(barotropic_parameter)
         array_physical_distance.append(d_z[0])
         array_luminosity_distance.append(d_L)
         #placing values into arrays so they can be plotted later
@@ -109,7 +114,7 @@ while a < a_0:
         pressure_phi = x**2 /2 - scalar_potential
         energy_density_m = (a_0/a)**3 * rho_m0
         H = ((energy_density_m+energy_density_phi)/(3*M_pl_2))**(1/2)
-        d_z = integrate.quad(physical_distance, a, 1)
+        d_z = integrate.quad(physical_distance_integrand, a, 1)
         d_L = (1/a) * d_z[0]
         #calculating values from inputs, these will be used to update the infintesimals
 
@@ -120,7 +125,7 @@ while a < a_0:
 
         array_a.append(a)
         array_phi.append(phi)
-        array_omega.append(pressure_phi/energy_density_phi)
+        array_barotropic_parameter.append(pressure_phi/energy_density_phi)
         array_physical_distance.append(d_z[0])
         array_luminosity_distance.append(d_L)
         #placing values into arrays so they can be plotted later
@@ -139,7 +144,7 @@ mplt.ylabel('Phi')
 mplt.legend()
 mplt.show()
 
-mplt.plot(array_a, array_omega)
+mplt.plot(array_a, array_barotropic_parameter)
 mplt.xlabel('Scale Factor, a')
 mplt.ylabel('Barotrpoic Parameter, w')
 mplt.legend()
