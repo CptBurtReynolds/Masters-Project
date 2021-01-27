@@ -70,7 +70,7 @@ array_luminosity_distance = []
 def barotropic_integrand(a):
     return (3/a)*(1 + barotropic_parameter)
 def physical_distance_integrand(a):
-    return (1/a**2)*(Omega_m0 * a**(-3) + Omega_de0 * np.exp(1*integrate.quad(barotropic_integrand, 1, a)[0]))**(-1/2)
+    return (1/a**2)*(Omega_m0 * a**(-3) + Omega_de0 * np.exp(-1*integrate.quad(barotropic_integrand, 1, a)[0]))**(-1/2)
 ##########################################################
 
 
