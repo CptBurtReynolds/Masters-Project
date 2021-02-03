@@ -52,25 +52,30 @@ phi = phi_i
 a = a_i
 x = x_i
 t = t_i
-dt = 0.001 * t
+z = z_i
+da = 0.0001 * a
+dt = (n*t/(2*a)) * da
 ##########################################################
 
 ################### Arrays for plotting ##################
 array_a = []
+array_z = []
 array_phi = []
 array_H = []
 array_barotropic_parameter = []
+array_physical_distance_integrand = [0]
 array_physical_distance = []
 array_luminosity_distance = []
+array_Omega = []
 ##########################################################
 
 ############### Functions for Integrals ##################
-#def physical_distance(a):
+#def integrand(a, H):
     #return 1/(H * a**2)
-def barotropic_integrand(a):
-    return (3/a)*(1 + barotropic_parameter)
-def physical_distance_integrand(a):
-    return (1/a**2)*(Omega_m0 * a**(-3) + Omega_de0 * np.exp(-1*integrate.quad(barotropic_integrand, 1, a)[0]))**(-1/2)
+#def barotropic_integrand(a):
+    #return (3/a)*(1 + barotropic_parameter)
+#def physical_distance_integrand(a):
+    #return (1/a**2) * (Omega_m0 * a**(-3) )**(-1/2)
 ##########################################################
 
 
@@ -84,27 +89,26 @@ while a < a_0:
         energy_density_m = (a_0/a)**3 * rho_m0
         barotropic_parameter = pressure_phi/energy_density_phi
         H = ((energy_density_m+energy_density_phi)/(3*M_pl_2))**(1/2)
-        d_z = integrate.quad(physical_distance_integrand, a, 1)
-        d_L = (1/a) * d_z[0] 
         #calculating values from inputs, these will be used to update the infintesimals
 
         dphi = x*dt
         dx = (-6*x/(n*t) + lambdo*M_pl_3*np.exp(-lambdo*phi/M_pl)) * dt
-        da = (2*a/(n*t)) * dt
+        dt = (n*t/(2*a)) * da
         #solving scalar field equation pre-transition
 
         array_a.append(a)
         array_phi.append(phi)
+        array_z.append((1/a) - 1)
         array_barotropic_parameter.append(barotropic_parameter)
-        array_physical_distance.append(d_z[0])
-        array_luminosity_distance.append(d_L)
+        array_physical_distance_integrand.append(array_physical_distance_integrand[-1] + (da/(H * a**2)))
+        array_Omega.append(energy_density_phi/(energy_density_phi+energy_density_m))
         #placing values into arrays so they can be plotted later
-
         x = x + dx
         phi = phi + dphi
         a = a + da
         t = t + dt
         #progressing timestep and updating values
+        
     ######################################################
 
     ############### Post-transition loop #################
@@ -113,21 +117,21 @@ while a < a_0:
         energy_density_phi = x**2 /2 + scalar_potential
         pressure_phi = x**2 /2 - scalar_potential
         energy_density_m = (a_0/a)**3 * rho_m0
+        barotropic_parameter = pressure_phi/energy_density_phi
         H = ((energy_density_m+energy_density_phi)/(3*M_pl_2))**(1/2)
-        d_z = integrate.quad(physical_distance_integrand, a, 1)
-        d_L = (1/a) * d_z[0]
         #calculating values from inputs, these will be used to update the infintesimals
 
         dphi = x*dt
         dx = (-3*H*x - (eta*lambdo/M_pl)*scalar_potential) * dt
-        da = a*H*dt
+        dt = (1/(a*H))*da
         #solving scalar field equation post-transition
 
         array_a.append(a)
         array_phi.append(phi)
-        array_barotropic_parameter.append(pressure_phi/energy_density_phi)
-        array_physical_distance.append(d_z[0])
-        array_luminosity_distance.append(d_L)
+        array_z.append((1/a) - 1)
+        array_barotropic_parameter.append(barotropic_parameter)
+        array_physical_distance_integrand.append(array_physical_distance_integrand[-1] + (da/(H * a**2)))
+        array_Omega.append(energy_density_phi/(energy_density_phi+energy_density_m))
         #placing values into arrays so they can be plotted later
 
         x = x + dx
@@ -138,26 +142,49 @@ while a < a_0:
     ######################################################
 
 
-mplt.plot(array_a, array_phi)
-mplt.xlabel('Scale Factor, a')
+############ Physical and Luminosity Distance ############
+d_z_i = array_physical_distance_integrand[-1]
+array_physical_distance_integrand.pop()
+for val in array_physical_distance_integrand:
+    array_physical_distance.append(d_z_i - val)
+
+for val_phys, val_a in zip(array_physical_distance,array_a):
+    array_luminosity_distance.append(1/val_a * val_phys)
+##########################################################
+
+
+#array_z = np.zeros(len(array_a))
+#for i in range(0,len(array_a)):
+    #array_z[i] = (1/array_a[i]) -1
+#Generating redshift values from scale factor, used for plotting
+
+
+mplt.plot(array_z, array_phi)
+mplt.xlabel('Redshift, z')
 mplt.ylabel('Phi')
 mplt.legend()
 mplt.show()
 
-mplt.plot(array_a, array_barotropic_parameter)
-mplt.xlabel('Scale Factor, a')
+mplt.plot(array_z, array_barotropic_parameter)
+mplt.xlabel('Redshift, z')
 mplt.ylabel('Barotrpoic Parameter, w')
 mplt.legend()
 mplt.show()
 
-mplt.plot(array_a, array_physical_distance)
-mplt.xlabel('Scale Factor, a')
-mplt.ylabel('Physical Distance, d(a)')
+mplt.plot(array_z, array_physical_distance)
+mplt.xlabel('Redshift, z')
+mplt.ylabel('Physical Distance, d(z)')
 mplt.legend()
 mplt.show()
 
-mplt.plot(array_a, array_luminosity_distance)
-mplt.xlabel('Scale Factor, a')
-mplt.ylabel('Luminosity Distance, d_L(a)')
+mplt.plot(array_z, array_luminosity_distance)
+mplt.xlabel('Redshift, z')
+mplt.ylabel('Luminosity Distance, d_L(z)')
 mplt.legend()
+mplt.show()
+
+mplt.plot(array_z, array_Omega)
+mplt.xlabel('Redshift, z')
+mplt.ylabel('Phi Energy Density Fraction, Omega')
+mplt.legend
 mplt.show()
