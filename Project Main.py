@@ -64,8 +64,11 @@ array_phi = []
 array_H = []
 array_barotropic_parameter = []
 array_physical_distance_integrand = [0]
+array_LCDM_integrand = [0]
 array_physical_distance = []
+array_LCDM_physical_distance = []
 array_luminosity_distance = []
+array_LCDM_luminosity_distance = []
 array_Omega = []
 ##########################################################
 
@@ -89,6 +92,7 @@ while a < a_0:
         energy_density_m = (a_0/a)**3 * rho_m0
         barotropic_parameter = pressure_phi/energy_density_phi
         H = ((energy_density_m+energy_density_phi)/(3*M_pl_2))**(1/2)
+        LCDM_H = ((rho_m0 * a**(-3) + rho_de0)/(3*M_pl_2))**(1/2)
         #calculating values from inputs, these will be used to update the infintesimals
 
         dphi = x*dt
@@ -101,6 +105,7 @@ while a < a_0:
         array_z.append((1/a) - 1)
         array_barotropic_parameter.append(barotropic_parameter)
         array_physical_distance_integrand.append(array_physical_distance_integrand[-1] + (da/(H * a**2)))
+        array_LCDM_integrand.append(array_LCDM_integrand[-1] + (da/(LCDM_H * a**2)))
         array_Omega.append(energy_density_phi/(energy_density_phi+energy_density_m))
         #placing values into arrays so they can be plotted later
         x = x + dx
@@ -119,6 +124,7 @@ while a < a_0:
         energy_density_m = (a_0/a)**3 * rho_m0
         barotropic_parameter = pressure_phi/energy_density_phi
         H = ((energy_density_m+energy_density_phi)/(3*M_pl_2))**(1/2)
+        LCDM_H = ((rho_m0 * a**(-3) + rho_de0)/(3*M_pl_2))**(1/2)
         #calculating values from inputs, these will be used to update the infintesimals
 
         dphi = x*dt
@@ -131,6 +137,7 @@ while a < a_0:
         array_z.append((1/a) - 1)
         array_barotropic_parameter.append(barotropic_parameter)
         array_physical_distance_integrand.append(array_physical_distance_integrand[-1] + (da/(H * a**2)))
+        array_LCDM_integrand.append(array_LCDM_integrand[-1] + (da/(LCDM_H * a**2)))
         array_Omega.append(energy_density_phi/(energy_density_phi+energy_density_m))
         #placing values into arrays so they can be plotted later
 
@@ -140,6 +147,7 @@ while a < a_0:
         t = t + dt
         #progressing timestep and updating values
     ######################################################
+    #print(LCDM_H, array_LCDM_integrand[-1])
 
 
 ############ Physical and Luminosity Distance ############
@@ -152,39 +160,45 @@ for val_phys, val_a in zip(array_physical_distance,array_a):
     array_luminosity_distance.append(1/val_a * val_phys)
 ##########################################################
 
+############ Physical and Luminosity Distance ############
+LCDM_d_z_i = array_LCDM_integrand[-1]
+array_LCDM_integrand.pop()
+for val in array_LCDM_integrand:
+    array_LCDM_physical_distance.append(LCDM_d_z_i - val)
 
-#array_z = np.zeros(len(array_a))
-#for i in range(0,len(array_a)):
-    #array_z[i] = (1/array_a[i]) -1
-#Generating redshift values from scale factor, used for plotting
+for val_phys, val_a in zip(array_LCDM_physical_distance,array_a):
+    array_LCDM_luminosity_distance.append(1/val_a * val_phys)
+##########################################################
 
 
-mplt.plot(array_z, array_phi)
+mplt.plot(array_z, array_phi, label = 'STFQ', color = 'r')
 mplt.xlabel('Redshift, z')
 mplt.ylabel('Phi')
 mplt.legend()
 mplt.show()
 
-mplt.plot(array_z, array_barotropic_parameter)
+mplt.plot(array_z, array_barotropic_parameter, label = 'STFQ', color = 'r')
 mplt.xlabel('Redshift, z')
 mplt.ylabel('Barotrpoic Parameter, w')
 mplt.legend()
 mplt.show()
 
-mplt.plot(array_z, array_physical_distance)
+mplt.plot(array_z, array_physical_distance, label = 'STFQ', color = 'r')
+mplt.plot(array_z, array_LCDM_physical_distance, label = 'LCDM', color = 'c')
 mplt.xlabel('Redshift, z')
 mplt.ylabel('Physical Distance, d(z)')
 mplt.legend()
 mplt.show()
 
-mplt.plot(array_z, array_luminosity_distance)
+mplt.plot(array_z, array_luminosity_distance, label = 'STFQ', color = 'r')
+mplt.plot(array_z, array_LCDM_luminosity_distance, label = 'LCDM', color = 'c')
 mplt.xlabel('Redshift, z')
 mplt.ylabel('Luminosity Distance, d_L(z)')
 mplt.legend()
 mplt.show()
 
-mplt.plot(array_z, array_Omega)
-mplt.xlabel('Redshift, z')
-mplt.ylabel('Phi Energy Density Fraction, Omega')
-mplt.legend
-mplt.show()
+#mplt.plot(array_z, array_Omega)
+#mplt.xlabel('Redshift, z')
+#mplt.ylabel('Phi Energy Density Fraction, Omega')
+#mplt.legend
+#mplt.show()
