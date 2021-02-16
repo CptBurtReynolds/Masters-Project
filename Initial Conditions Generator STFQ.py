@@ -46,4 +46,4 @@ t_i = 2/(n*H_i)
 #Initial time derived with Hubble paramter
 ##########################################################
 
-print(a_c, lambdo, phi_c, a_i, phi_i, x_i, t_i)
+print(a_c, lambdo, phi_c, a_i, phi_i, x_i, t_i, H_i)
