@@ -43,11 +43,11 @@ def main():
     
     # Loop for solving the scalar field equation and the density perturbation equation
     while a < a_0:
-        
+        #print(y, y_LCDM)
         if phi < phi_c:
-            values, dt, x, phi, G, y, G_LCDM, y_LCDM, a, t = pre_transition(values, lambdo, phi, x, G, y, G_LCDM, y_LCDM, a_0, a, dt, t, da)
+            values, dt, x, phi, G, y, G_LCDM, y_LCDM, a, t = pre_transition(values, lambdo, phi, x, G, y, G_LCDM, y_LCDM, a_0, a, da, t, dt)
         else:
-            values, dt, x, phi, G, y, G_LCDM, y_LCDM, a, t = post_transition(values, lambdo, phi_c, phi, x, G, y, G_LCDM, y_LCDM, a_0, a, dt, da, t)
+            values, dt, x, phi, G, y, G_LCDM, y_LCDM, a, t = post_transition(values, lambdo, phi_c, phi, x, G, y, G_LCDM, y_LCDM, a_0, a, da, t, dt)
 
     values.calculate_physical_Luminosity_distance() # Calculate the physical and luminosity distances. Done post-loop due to form of intergral
     values.calculate_fractional_growth() # Calculates the fractional growth from the STFQ and LCDM f(z)G(z) values
@@ -92,7 +92,7 @@ def derive_initial_time(a_i, lambdo, phi_i, a_0):
     
     return t_i
 
-def pre_transition(values, lambdo, phi, x, G, y, G_LCDM, y_LCDM, a_0, a, dt, t, da):
+def pre_transition(values, lambdo, phi, x, G, y, G_LCDM, y_LCDM, a_0, a, da, t, dt):
     """Solve the scalar field and density purterbation equations pre-transition"""
 
     # Calculating values from inputs, these will be used to update the infintesimals
@@ -119,19 +119,11 @@ def pre_transition(values, lambdo, phi, x, G, y, G_LCDM, y_LCDM, a_0, a, dt, t, 
     # Placing values into arrays so they can be plotted later
     values.a.append(a)
     values.z.append((1/a) - 1)
-    values.phi.append(phi)
-    values.G.append(G)
-    values.y.append(y)
-    values.G_LCDM.append(y_LCDM)
-    values.y_LCDM.append(dG_LCDM)
-    values.f.append((a/G)*(dG/da))
-    values.f_LCDM.append((a/G_LCDM)*(dG_LCDM/da))
-    values.fG.append(a*(dG/da))
-    values.fG_LCDM.append(a*(dG_LCDM/da))
     values.barotropic_parameter.append(barotropic_parameter)
     values.physical_distance_integrand.append(values.physical_distance_integrand[-1] + (da/(H * a**2)))
     values.LCDM_integrand.append(values.LCDM_integrand[-1] + (da/(H_LCDM * a**2)))
-    values.Omega.append(energy_density_phi/(energy_density_phi+energy_density_m))
+    values.fG.append(a*(dG/da))
+    values.fG_LCDM.append(a*(dG_LCDM/da))
 
     # Updating the timestamp
     dt = (CONSTANT_n*t/(2*a)) * da
@@ -149,7 +141,7 @@ def pre_transition(values, lambdo, phi, x, G, y, G_LCDM, y_LCDM, a_0, a, dt, t, 
     return values, dt, x, phi, G, y, G_LCDM, y_LCDM, a, t
 
 
-def post_transition(values, lambdo, phi_c, phi, x, G, y, G_LCDM, y_LCDM, a_0, a, dt, da, t):
+def post_transition(values, lambdo, phi_c, phi, x, G, y, G_LCDM, y_LCDM, a_0, a, da, t, dt):
     """Solve the scalar field and density purterbation equations post-transition"""
 
     # Calculating values from inputs, these will be used to update the infintesimals
@@ -176,19 +168,11 @@ def post_transition(values, lambdo, phi_c, phi, x, G, y, G_LCDM, y_LCDM, a_0, a,
     # Placing values into arrays so they can be plotted later
     values.a.append(a)
     values.z.append((1/a) - 1)
-    values.phi.append(phi)
-    values.G.append(G)
-    values.y.append(y)
-    values.G_LCDM.append(G_LCDM)
-    values.y_LCDM.append(y_LCDM)
-    values.f.append((a/G)*(dG/da))
-    values.f_LCDM.append((a/G_LCDM)*(dG_LCDM/da))
-    values.fG.append(a*(dG/da))
-    values.fG_LCDM.append(a*(dG_LCDM/da))
     values.barotropic_parameter.append(barotropic_parameter)
     values.physical_distance_integrand.append(values.physical_distance_integrand[-1] + (da/(H * a**2)))
     values.LCDM_integrand.append(values.LCDM_integrand[-1] + (da/(H_LCDM * a**2)))
-    values.Omega.append(energy_density_phi/(energy_density_phi+energy_density_m))
+    values.fG.append(a*(dG/da))
+    values.fG_LCDM.append(a*(dG_LCDM/da))
     
     # Updating the timestamp
     dt = (CONSTANT_n*t/(2*a)) * da
@@ -209,13 +193,6 @@ def post_transition(values, lambdo, phi_c, phi, x, G, y, G_LCDM, y_LCDM, a_0, a,
 def plotGraphs(values):
     """Plots Graph from given values"""
 
-    # Scalar field against redshift
-    # mplt.plot(values.z, values.phi, label = 'STFQ', color = 'r')
-    # mplt.xlabel('Redshift, z')
-    # mplt.ylabel('Phi')
-    # mplt.legend()
-    # mplt.show()
-
     # Barotropic parameter against redshift
     mplt.plot(values.z, values.barotropic_parameter, label = 'STFQ', color = 'r')
     mplt.xlabel('Redshift, z')
@@ -227,13 +204,6 @@ def plotGraphs(values):
     mplt.plot(values.z, values.fractional_luminosity_distance, label = 'Fractional dL', color = 'r')
     mplt.xlabel('Redshift, z')
     mplt.ylabel('Fractional Luminosity Distance')
-    mplt.legend()
-    mplt.show()
-
-    mplt.plot(values.a, values.y, label = 'STFQ', color = 'r')
-    mplt.plot(values.a, values.y_LCDM, label = 'LCDM', color = 'c')
-    mplt.xlabel('Redshift, z')
-    mplt.ylabel('dG/dt, y')
     mplt.legend()
     mplt.show()
 
@@ -249,17 +219,6 @@ class PlottingArrays:
     def __init__(self):
         self.a = []
         self.z = []
-        self.phi = []
-        self.G = []
-        self.G_LCDM = []
-        self.y = []
-        self.y_LCDM = []
-        self.f = []
-        self.f_LCDM = []
-        self.fG = []
-        self.fG_LCDM = []
-        self.fractional_growth = []
-        self.growth_index = []
         self.barotropic_parameter = []
         self.physical_distance_integrand = [0]
         self.LCDM_integrand = [0]
@@ -268,7 +227,10 @@ class PlottingArrays:
         self.luminosity_distance = []
         self.LCDM_luminosity_distance = []
         self.fractional_luminosity_distance = []
-        self.Omega = []
+        self.fG = []
+        self.fG_LCDM = []
+        self.fractional_growth = []
+        self.growth_index = []
 
     def calculate_physical_Luminosity_distance(self):
         """Calculate physical and then luminosity distances numerically"""
