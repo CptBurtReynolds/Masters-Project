@@ -16,19 +16,18 @@ CONSTANT_rho_c = 3.7468*10**(-47) # Critical energy density in GeV^4
 CONSTANT_rho_m0 = CONSTANT_Omega_m0 * CONSTANT_rho_c # Present matter energy density in GeV^4
 CONSTANT_rho_de0 = CONSTANT_Omega_de0 * CONSTANT_rho_c # Present dark energy energy density in GeV^4
 CONSTANT_n = 3 # Dominant energy component (matter)
+CONSTANT_crossover_scale = 1.0/(CONSTANT_H_0*(1.0 - CONSTANT_Omega_de0)) # Crossover scale for DGP model
 
 # Input Values
-#lambdo = 5 # Model parameter
 Z_I = 20 # Initial redshift
-Z_C = 10 # Redshift at crossover
+Z_C = 10.0 # Redshift at crossover
 ETA = 0.5 # Model parameter after crossover
-
 
 def main():
     """Program to model the evolution of the STFQ Dark Energy model across a redshift range."""
 
     a_0 = 1 # Present scale factor
-    lambdo, phi_c, a, phi, x = derive_parameters(a_0) # Derived parameters
+    lambdo, phi_c, a, phi, x = derive_parameters(a_0) # Derived parameters for scalar field analysis and the scale factor
     t = derive_initial_time(a, lambdo, phi, a_0) # Deriving initial time
 
     # Initial values and timestep
@@ -36,22 +35,30 @@ def main():
     dt = (CONSTANT_n*t/(2*a)) * da
 
     # Growth factor analysis initial values
-    G, y, G_LCDM, y_LCDM = derive_inital_growth_parameters(a, da, dt)
+    G=G_LCDM=G_DGP = 1.0*a
+    y=y_LCDM=y_DGP = da/dt
 
     # Structure to store values for plottting later
     values = PlottingArrays()
     
     # Loop for solving the scalar field equation and the density perturbation equation
     while a < a_0:
-        #print(y, y_LCDM)
+        
+        # Solving the scalar field equation for STFQ and calculating Hubble parameters
         if phi < phi_c:
-            values, dt, x, phi, G, y, G_LCDM, y_LCDM, a, t = pre_transition(values, lambdo, phi, x, G, y, G_LCDM, y_LCDM, a_0, a, da, t, dt)
+            values, H, H_LCDM, x, phi = pre_transition(values, lambdo, phi, x, a_0, a, da, t, dt)
         else:
-            values, dt, x, phi, G, y, G_LCDM, y_LCDM, a, t = post_transition(values, lambdo, phi_c, phi, x, G, y, G_LCDM, y_LCDM, a_0, a, da, t, dt)
+            values, H, H_LCDM, x, phi = post_transition(values, lambdo, phi_c, phi, x, a_0, a, da, dt)
+        # Solving density perturbation equations and updating timesteps
+        values, G, y, G_LCDM, y_LCDM, G_DGP, y_DGP = perturbation_equation(values, H, H_LCDM, G, y, G_LCDM, y_LCDM, G_DGP, y_DGP, a_0, a, da, dt)
+        values, a, t, dt = timestep(values, a, da, t)
 
-    values.calculate_physical_Luminosity_distance() # Calculate the physical and luminosity distances. Done post-loop due to form of intergral
-    values.calculate_fractional_growth() # Calculates the fractional growth from the STFQ and LCDM f(z)G(z) values
-    plotGraphs(values) # Plot graphs from calculated values
+    # Calculates the fractional luminosity distance for STFQ and LCDM. Done post-loop due to form of the physical distance intergral
+    values.calculate_physical_Luminosity_distance() 
+    # Calculates the fractional growth from the STFQ and LCDM f(z)G(z) values
+    values.calculate_fractional_growth() 
+    # Plot graphs from calculated values
+    plotGraphs(values) 
 
 def derive_parameters(a_0):
     """Derives initial parameters from global variables (constants and input parameters)"""
@@ -73,13 +80,6 @@ def derive_parameters(a_0):
     
     return lambdo, phi_c, a_i, phi_i, x_i
 
-def derive_inital_growth_parameters(a, da, dt):
-    G_i = 1*a
-    y_i = da/dt
-
-    return G_i, y_i, G_i, y_i
-
-
 def derive_initial_time(a_i, lambdo, phi_i, a_0):
     """Derives initial time parameters from global variables and input parameters"""
 
@@ -92,106 +92,114 @@ def derive_initial_time(a_i, lambdo, phi_i, a_0):
     
     return t_i
 
-def pre_transition(values, lambdo, phi, x, G, y, G_LCDM, y_LCDM, a_0, a, da, t, dt):
-    """Solve the scalar field and density purterbation equations pre-transition"""
+def pre_transition(values, lambdo, phi, x, a_0, a, da, t, dt):
+    """Solves the scalar field equation pre-transition"""
 
-    # Calculating values from inputs, these will be used to update the infintesimals
+    # Calculating energy densities, pressure, the barotropic parameter, and the Hubble parameter from the pre-transition scalar potential
     scalar_potential = CONSTANT_M_pl_4 * np.exp(-lambdo*phi/CONSTANT_M_pl)
-    # Calculating Energy densities, pressure and the barotropic parameter
     energy_density_phi = x**2 /2 + scalar_potential
     pressure_phi = x**2 /2 - scalar_potential
     energy_density_m = (a_0/a)**3 * CONSTANT_rho_m0
     barotropic_parameter = pressure_phi/energy_density_phi
-    # Calculating the Hubble parameter for STFQ and LCDM
     H = ((energy_density_m+energy_density_phi)/(3*CONSTANT_M_pl_2))**(1/2)
+
+    # Calculating the Hubble parameter for LCDM
     H_LCDM = ((CONSTANT_rho_m0 * a**(-3) + CONSTANT_rho_de0)/(3*CONSTANT_M_pl_2))**(1/2)
-    
+
     # Solving scalar field equation pre-transition
     dphi = x*dt
-    dx = (-6*x/(CONSTANT_n*t) + lambdo*CONSTANT_M_pl_3*np.exp(-lambdo*phi/CONSTANT_M_pl)) * dt
-    
-    # Solving density perturbation equation pre-transition for both STFQ and LCDM
-    dG = y*dt
-    dy = ((3/2)*CONSTANT_Omega_m0*CONSTANT_H_0_2*(1/a**3)*G - 2*H*y)*dt
-    dG_LCDM = y_LCDM*dt
-    dy_LCDM = ((3/2)*CONSTANT_Omega_m0*CONSTANT_H_0_2*(1/a**3)*G_LCDM - 2*H_LCDM*y_LCDM)*dt
+    dx = (-3*H*x + (lambdo/CONSTANT_M_pl)*scalar_potential) * dt
     
     # Placing values into arrays so they can be plotted later
-    values.a.append(a)
-    values.z.append((1/a) - 1)
     values.barotropic_parameter.append(barotropic_parameter)
     values.physical_distance_integrand.append(values.physical_distance_integrand[-1] + (da/(H * a**2)))
     values.LCDM_integrand.append(values.LCDM_integrand[-1] + (da/(H_LCDM * a**2)))
-    values.fG.append(a*(dG/da))
-    values.fG_LCDM.append(a*(dG_LCDM/da))
-
-    # Updating the timestamp
-    dt = (CONSTANT_n*t/(2*a)) * da
 
     # Progressing timestep and updating values
     x = x + dx
     phi = phi + dphi
-    y = y + dy
-    G = G + dG
-    y_LCDM = y_LCDM + dy_LCDM
-    G_LCDM = G_LCDM + dG_LCDM
-    a = a + da
-    t = t + dt
     
-    return values, dt, x, phi, G, y, G_LCDM, y_LCDM, a, t
+    return values, H, H_LCDM, x, phi
 
+def post_transition(values, lambdo, phi_c, phi, x, a_0, a, da, dt):
+    """Solves the scalar field equation post-transition for STFQ"""
 
-def post_transition(values, lambdo, phi_c, phi, x, G, y, G_LCDM, y_LCDM, a_0, a, da, t, dt):
-    """Solve the scalar field and density purterbation equations post-transition"""
-
-    # Calculating values from inputs, these will be used to update the infintesimals
+    # Calculating energy densities, pressure, the barotropic parameter, and the Hubble parameter from the post-transition scalar potential
     scalar_potential = CONSTANT_M_pl_4 * np.exp(-lambdo*phi_c/CONSTANT_M_pl) * np.exp(lambdo*ETA*(phi - phi_c)/CONSTANT_M_pl)
-    # Calculating Energy densities, pressures and the barotropic parameter
     energy_density_phi = x**2 /2 + scalar_potential
     pressure_phi = x**2 /2 - scalar_potential
     energy_density_m = (a_0/a)**3 * CONSTANT_rho_m0
     barotropic_parameter = pressure_phi/energy_density_phi
-    # Calculating the Hubble parameter for STFQ and LCDM
     H = ((energy_density_m+energy_density_phi)/(3*CONSTANT_M_pl_2))**(1/2)
+
+    # Calculating the LCDM Hubble parameter
     H_LCDM = ((CONSTANT_rho_m0 * a**(-3) + CONSTANT_rho_de0)/(3*CONSTANT_M_pl_2))**(1/2)
     
     # Solving scalar field equation post-transition
     dphi = x*dt
     dx = (-3*H*x - (ETA*lambdo/CONSTANT_M_pl)*scalar_potential) * dt
-    
-    # Solving density perturbation equation pre-transition
-    dG = y*dt
-    dy = ((3/2)*CONSTANT_Omega_m0*CONSTANT_H_0_2*(1/a**3)*G - 2*H*y)*dt
-    dG_LCDM = y_LCDM*dt
-    dy_LCDM = ((3/2)*CONSTANT_Omega_m0*CONSTANT_H_0_2*(1/a**3)*G_LCDM - 2*H_LCDM*y_LCDM)*dt
 
     # Placing values into arrays so they can be plotted later
-    values.a.append(a)
-    values.z.append((1/a) - 1)
     values.barotropic_parameter.append(barotropic_parameter)
     values.physical_distance_integrand.append(values.physical_distance_integrand[-1] + (da/(H * a**2)))
     values.LCDM_integrand.append(values.LCDM_integrand[-1] + (da/(H_LCDM * a**2)))
-    values.fG.append(a*(dG/da))
-    values.fG_LCDM.append(a*(dG_LCDM/da))
-    
-    # Updating the timestamp
-    dt = (CONSTANT_n*t/(2*a)) * da
 
     # Progressing timestep and updating values
     x = x + dx
     phi = phi + dphi
-    y = y + dy
+    
+    return values, H, H_LCDM, x, phi
+
+def perturbation_equation(values, H, H_LCDM, G, y, G_LCDM, y_LCDM, G_DGP, y_DGP, a_0, a, da, dt):
+    """Solves the density perturbation equation for a variety of models"""
+
+    # Solving density perturbation equation for STFQ
+    energy_density_m = (a_0/a)**3 * CONSTANT_rho_m0
+    dG = y*dt
+    dy = (energy_density_m*G/(2.0*CONSTANT_M_pl_2) - 2*H*y)*dt
+    # Solving density perturbation equation for LCDM
+    dG_LCDM = y_LCDM*dt
+    dy_LCDM = (energy_density_m*G_LCDM/(2.0*CONSTANT_M_pl_2) - 2*H_LCDM*y_LCDM)*dt
+    # Calculating the Hubble parameter for DGP
+    small_bombs = (CONSTANT_crossover_scale**(-2.0) + (4.0*energy_density_m)/(3.0*CONSTANT_M_pl_2))**(0.5)
+    H_DGP = 0.5*(CONSTANT_crossover_scale**(-1.0) + small_bombs)
+    Hdot_DGP = (-energy_density_m*H_DGP)/(CONSTANT_M_pl_2*small_bombs)
+    beta = 1- 2.0*CONSTANT_crossover_scale*H_DGP*(1.0 + Hdot_DGP/(3.0*(H_DGP)**(2.0)))
+    # Solving density pertubation equation for DGP
+    dG_DGP = y_DGP*dt
+    dy_DGP = ((energy_density_m*G_DGP/(2.0*CONSTANT_M_pl_2))*(1.0 + 1.0/(3.0*beta)) - 2*H_DGP*y_DGP)*dt
+
+    # Appending values into arrays
+    values.fG.append(a*(dG/da))
+    values.fG_LCDM.append(a*(dG_LCDM/da))
+    values.fG_DGP.append(a*(dG_DGP/da))
+
+    # Updating variables
     G = G + dG
-    y_LCDM = y_LCDM + dy_LCDM
+    y = y + dy
     G_LCDM = G_LCDM + dG_LCDM
+    y_LCDM = y_LCDM + dy_LCDM
+    G_DGP = G_DGP + dG_DGP
+    y_DGP = y_LCDM + dy_DGP
+    
+    return values, G, y, G_LCDM, y_LCDM, G_DGP, y_DGP
+
+def timestep(values, a, da, t):
+    """Updates the timestep variables"""
+
+    # Appending values into arrays
+    values.a.append(a)
+    values.z.append((1/a) - 1)
+
+    # Updating the timesteps
+    dt = (CONSTANT_n*t/(2*a)) * da
     a = a + da
     t = t + dt
+
+    return values, a, t, dt
     
-    return values, dt, x, phi, G, y, G_LCDM, y_LCDM, a, t
-
-
 def plotGraphs(values):
-    """Plots Graph from given values"""
+    """Plots graphs from prior calculated values"""
 
     # Barotropic parameter against redshift
     mplt.plot(values.z, values.barotropic_parameter, label = 'STFQ', color = 'r')
@@ -207,6 +215,15 @@ def plotGraphs(values):
     mplt.legend()
     mplt.show()
 
+    mplt.plot(values.z, values.fG, label = 'STFQ', color = 'r')
+    mplt.plot(values.z, values.fG_LCDM, label = 'LCDM', color = 'c')
+    mplt.plot(values.z, values.fG_DGP, label = 'DGP', color = 'g')
+    mplt.xlabel('Redshift, z')
+    mplt.ylabel('Fractional Growth, f(z)G(z)')
+    mplt.legend()
+    mplt.show()
+
+
     # Fractional Growth Factor G against redshift
     mplt.plot(values.z, values.fractional_growth, label = 'Fractional fG', color = 'r')
     mplt.xlabel('Redshift, z')
@@ -220,6 +237,7 @@ class PlottingArrays:
         self.a = []
         self.z = []
         self.barotropic_parameter = []
+        
         self.physical_distance_integrand = [0]
         self.LCDM_integrand = [0]
         self.physical_distance = []
@@ -227,10 +245,14 @@ class PlottingArrays:
         self.luminosity_distance = []
         self.LCDM_luminosity_distance = []
         self.fractional_luminosity_distance = []
+
         self.fG = []
         self.fG_LCDM = []
+        self.fG_DGP = []
         self.fractional_growth = []
         self.growth_index = []
+        self.growth_index_LCDM = []
+        self.growth_index_DGP = []
 
     def calculate_physical_Luminosity_distance(self):
         """Calculate physical and then luminosity distances numerically"""
@@ -264,8 +286,6 @@ class PlottingArrays:
         
         for val_STFQ, val_LCDM in zip(self.fG, self.fG_LCDM):
             self.fractional_growth.append((val_STFQ-val_LCDM)/(val_LCDM))
-
-
 
 if __name__ == "__main__":
     main()
