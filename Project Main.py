@@ -28,11 +28,11 @@ def main():
 
     a_0 = 1 # Present scale factor
     lambdo, phi_c, a, phi, x = derive_parameters(a_0) # Derived parameters for scalar field analysis and the scale factor
-    t = derive_initial_time(a, lambdo, phi, a_0) # Deriving initial time
+    H = derive_initial_time_and_Hubble(a, lambdo, phi, a_0) # Deriving initial time
 
     # Initial values and timestep
     da = 0.0001 * a
-    dt = (CONSTANT_n*t/(2*a)) * da
+    dt = dt_LCDM = dt_DGP = da/(a*H)
 
     # Growth factor analysis initial values
     G=G_LCDM=G_DGP = 1.0*a
@@ -46,12 +46,12 @@ def main():
         
         # Solving the scalar field equation for STFQ and calculating Hubble parameters
         if phi < phi_c:
-            values, H, H_LCDM, x, phi = pre_transition(values, lambdo, phi, x, a_0, a, da, t, dt)
+            values, H, H_LCDM, x, phi = pre_transition(values, lambdo, phi, x, a_0, a, da, dt)
         else:
             values, H, H_LCDM, x, phi = post_transition(values, lambdo, phi_c, phi, x, a_0, a, da, dt)
         # Solving density perturbation equations and updating timesteps
-        values, G, y, G_LCDM, y_LCDM, G_DGP, y_DGP = perturbation_equation(values, H, H_LCDM, G, y, G_LCDM, y_LCDM, G_DGP, y_DGP, a_0, a, da, dt)
-        values, a, t, dt = timestep(values, a, da, t)
+        values, G, y, G_LCDM, y_LCDM, H_DGP, G_DGP, y_DGP = perturbation_equation(values, H, H_LCDM, G, y, G_LCDM, y_LCDM, G_DGP, y_DGP, a_0, a, da, dt, dt_LCDM, dt_DGP)
+        values, a, dt, dt_LCDM, dt_DGP = timestep(values, a, da, H, H_LCDM, H_DGP)
 
     # Calculates the fractional luminosity distance for STFQ and LCDM. Done post-loop due to form of the physical distance intergral
     values.calculate_physical_Luminosity_distance() 
@@ -80,19 +80,20 @@ def derive_parameters(a_0):
     
     return lambdo, phi_c, a_i, phi_i, x_i
 
-def derive_initial_time(a_i, lambdo, phi_i, a_0):
+def derive_initial_time_and_Hubble(a_i, lambdo, phi_i, a_0):
     """Derives initial time parameters from global variables and input parameters"""
-
+    
     rho_m_i = (a_0/a_i)**3 * CONSTANT_rho_m0 # Initial matter energy density
     rho_phi_i = 2 * CONSTANT_M_pl_4 * np.exp(-lambdo*phi_i/CONSTANT_M_pl) # Initial scalar energy density
 
     # Initial time derived with Hubble paramter
+    # The calculation for t might be completely scuffed. Luckily it isnt used anywhere, but caution should be used if using t anywhere
     H_i = ((rho_m_i+rho_phi_i)/(3*CONSTANT_M_pl_2))**(1/2)
-    t_i = 2/(CONSTANT_n*H_i)
+    #t_i = 2/(CONSTANT_n*H_i)
     
-    return t_i
+    return H_i
 
-def pre_transition(values, lambdo, phi, x, a_0, a, da, t, dt):
+def pre_transition(values, lambdo, phi, x, a_0, a, da, dt):
     """Solves the scalar field equation pre-transition"""
 
     # Calculating energy densities, pressure, the barotropic parameter, and the Hubble parameter from the pre-transition scalar potential
@@ -150,29 +151,40 @@ def post_transition(values, lambdo, phi_c, phi, x, a_0, a, da, dt):
     
     return values, H, H_LCDM, x, phi
 
-def perturbation_equation(values, H, H_LCDM, G, y, G_LCDM, y_LCDM, G_DGP, y_DGP, a_0, a, da, dt):
+def perturbation_equation(values, H, H_LCDM, G, y, G_LCDM, y_LCDM, G_DGP, y_DGP, a_0, a, da, dt, dt_LCDM, dt_DGP):
     """Solves the density perturbation equation for a variety of models"""
 
     # Solving density perturbation equation for STFQ
-    energy_density_m = (a_0/a)**3 * CONSTANT_rho_m0
+    energy_density_m = (a_0/a)**(3.0) * CONSTANT_rho_m0
     dG = y*dt
     dy = (energy_density_m*G/(2.0*CONSTANT_M_pl_2) - 2*H*y)*dt
+    f = (a/G)*(dG/da)
+    growth_index = np.log(f)/np.log((energy_density_m)/(3.0*CONSTANT_M_pl_2*H**(2.0)))
+
     # Solving density perturbation equation for LCDM
-    dG_LCDM = y_LCDM*dt
-    dy_LCDM = (energy_density_m*G_LCDM/(2.0*CONSTANT_M_pl_2) - 2*H_LCDM*y_LCDM)*dt
+    dG_LCDM = y_LCDM*dt_LCDM
+    dy_LCDM = (energy_density_m*G_LCDM/(2.0*CONSTANT_M_pl_2) - 2*H_LCDM*y_LCDM)*dt_LCDM
+    f_LCDM = (a/G_LCDM)*(dG_LCDM/da)
+    growth_index_LCDM = np.log(f_LCDM)/np.log((energy_density_m)/(3.0*CONSTANT_M_pl_2*H_LCDM**(2.0)))
+
     # Calculating the Hubble parameter for DGP
     small_bombs = (CONSTANT_crossover_scale**(-2.0) + (4.0*energy_density_m)/(3.0*CONSTANT_M_pl_2))**(0.5)
     H_DGP = 0.5*(CONSTANT_crossover_scale**(-1.0) + small_bombs)
     Hdot_DGP = (-energy_density_m*H_DGP)/(CONSTANT_M_pl_2*small_bombs)
     beta = 1- 2.0*CONSTANT_crossover_scale*H_DGP*(1.0 + Hdot_DGP/(3.0*(H_DGP)**(2.0)))
     # Solving density pertubation equation for DGP
-    dG_DGP = y_DGP*dt
-    dy_DGP = ((energy_density_m*G_DGP/(2.0*CONSTANT_M_pl_2))*(1.0 + 1.0/(3.0*beta)) - 2*H_DGP*y_DGP)*dt
+    dG_DGP = y_DGP*dt_DGP
+    dy_DGP = ((energy_density_m*G_DGP/(2.0*CONSTANT_M_pl_2))*(1.0 + 1.0/(3.0*beta)) - 2*H_DGP*y_DGP)*dt_DGP
+    f_DGP = (a/G_DGP)*(dG_DGP/da)
+    growth_index_DGP = np.log(f_DGP)/np.log((energy_density_m)/(3*CONSTANT_M_pl_2*H_DGP**(2.0)))
 
     # Appending values into arrays
-    values.fG.append(a*(dG/da))
-    values.fG_LCDM.append(a*(dG_LCDM/da))
-    values.fG_DGP.append(a*(dG_DGP/da))
+    values.fG.append(f*G)
+    values.fG_LCDM.append(f_LCDM*G_LCDM)
+    values.fG_DGP.append(f_DGP*G_DGP)
+    values.growth_index.append(growth_index)
+    values.growth_index_LCDM.append(growth_index_LCDM)
+    values.growth_index_DGP.append(growth_index_DGP)
 
     # Updating variables
     G = G + dG
@@ -182,9 +194,9 @@ def perturbation_equation(values, H, H_LCDM, G, y, G_LCDM, y_LCDM, G_DGP, y_DGP,
     G_DGP = G_DGP + dG_DGP
     y_DGP = y_LCDM + dy_DGP
     
-    return values, G, y, G_LCDM, y_LCDM, G_DGP, y_DGP
+    return values, G, y, G_LCDM, y_LCDM, H_DGP, G_DGP, y_DGP
 
-def timestep(values, a, da, t):
+def timestep(values, a, da, H, H_LCDM, H_DGP):
     """Updates the timestep variables"""
 
     # Appending values into arrays
@@ -192,11 +204,13 @@ def timestep(values, a, da, t):
     values.z.append((1/a) - 1)
 
     # Updating the timesteps
-    dt = (CONSTANT_n*t/(2*a)) * da
+    dt = da/(a*H)
+    dt_LCDM = da/(a*H_LCDM)
+    dt_DGP = da/(a*H_DGP)
     a = a + da
-    t = t + dt
+    
 
-    return values, a, t, dt
+    return values, a, dt, dt_LCDM, dt_DGP
     
 def plotGraphs(values):
     """Plots graphs from prior calculated values"""
@@ -215,21 +229,21 @@ def plotGraphs(values):
     mplt.legend()
     mplt.show()
 
-    mplt.plot(values.z, values.fG, label = 'STFQ', color = 'r')
-    mplt.plot(values.z, values.fG_LCDM, label = 'LCDM', color = 'c')
-    mplt.plot(values.z, values.fG_DGP, label = 'DGP', color = 'g')
+    mplt.plot(values.z, values.growth_index, label = 'STFQ', color = 'r')
+    mplt.plot(values.z, values.growth_index_LCDM, label = 'LCDM', color = 'c')
+    mplt.plot(values.z, values.growth_index_DGP, label = 'DGP', color = 'g')
     mplt.xlabel('Redshift, z')
-    mplt.ylabel('Fractional Growth, f(z)G(z)')
+    mplt.ylabel('Growth index, gamma')
     mplt.legend()
     mplt.show()
 
 
     # Fractional Growth Factor G against redshift
-    mplt.plot(values.z, values.fractional_growth, label = 'Fractional fG', color = 'r')
-    mplt.xlabel('Redshift, z')
-    mplt.ylabel('Fractional Growth, f(z)G(z)')
-    mplt.legend()
-    mplt.show()
+    #mplt.plot(values.z, values.fractional_growth, label = 'Fractional fG', color = 'r')
+    #mplt.xlabel('Redshift, z')
+    #mplt.ylabel('Fractional Growth, f(z)G(z)')
+    #mplt.legend()
+    #mplt.show()
 
 class PlottingArrays:
     """Stores all array values needed to plot graphs"""
