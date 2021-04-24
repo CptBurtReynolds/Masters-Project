@@ -2,7 +2,6 @@
 import numpy as np
 import matplotlib.pyplot as mplt
 import scipy.integrate as integrate
-
 # Constants
 CONSTANT_H_0 = 1.580*10**(-42) # Hubble Constant in GeV
 CONSTANT_H_0_2 = CONSTANT_H_0**2 # Hubble constant squared
@@ -21,13 +20,13 @@ CONSTANT_crossover_scale = 1.0/(CONSTANT_H_0*(1.0 - CONSTANT_Omega_de0)) # Cross
 # Input Values
 Z_I = 20 # Initial redshift
 Z_C = 10.0 # Redshift at crossover
-ETA = 0.5 # Model parameter after crossover
+ETA = 1.0 # Model parameter after crossover
 
 def main():
     """Program to model the evolution of the STFQ Dark Energy model across a redshift range."""
 
     a_0 = 1 # Present scale factor
-    lambdo, phi_c, a, phi, x = derive_parameters(a_0) # Derived parameters for scalar field analysis and the scale factor
+    lambdo, phi_c, potential_c, a, phi, x = derive_parameters(a_0) # Derived parameters for scalar field analysis and the scale factor
     H = derive_initial_time_and_Hubble(a, lambdo, phi, a_0) # Deriving initial time
 
     # Initial values and timestep
@@ -46,9 +45,9 @@ def main():
         
         # Solving the scalar field equation for STFQ and calculating Hubble parameters
         if phi < phi_c:
-            values, H, H_LCDM, x, phi = pre_transition(values, lambdo, phi, x, a_0, a, da, dt)
+            values, H, H_LCDM, x, phi = pre_transition(values, lambdo, phi_c, potential_c, phi, x, a_0, a, da, dt)
         else:
-            values, H, H_LCDM, x, phi = post_transition(values, lambdo, phi_c, phi, x, a_0, a, da, dt)
+            values, H, H_LCDM, x, phi = post_transition(values, lambdo, phi_c, potential_c, phi, x, a_0, a, da, dt)
         # Solving density perturbation equations and updating timesteps
         values, G, y, G_LCDM, y_LCDM, H_DGP, G_DGP, y_DGP = perturbation_equation(values, H, H_LCDM, G, y, G_LCDM, y_LCDM, G_DGP, y_DGP, a_0, a, da, dt, dt_LCDM, dt_DGP)
         values, a, dt, dt_LCDM, dt_DGP = timestep(values, a, da, H, H_LCDM, H_DGP)
@@ -58,7 +57,9 @@ def main():
     # Calculates the fractional growth from the STFQ and LCDM f(z)G(z) values
     values.calculate_fractional_growth() 
     # Plot graphs from calculated values
-    plotGraphs(values) 
+    np.save("growthfrac_zc10,eta1.0.npy", [values.z,values.fractional_growth])
+    print("done")
+    #plotGraphs(values) 
 
 def derive_parameters(a_0):
     """Derives initial parameters from global variables (constants and input parameters)"""
@@ -70,6 +71,7 @@ def derive_parameters(a_0):
 
     # Second step; obtaining the scalar field value at crossover
     phi_c = CONSTANT_M_pl/lambdo * (4*np.log(CONSTANT_M_pl) - np.log(CONSTANT_rho_de0))
+    potential_c = CONSTANT_M_pl_4 * np.exp(-lambdo*phi_c/CONSTANT_M_pl)
 
     # Third step; obtaining initial scalar field value, must be less than crossover field value
     a_i = 1/(Z_I +1) #Initial scale factor
@@ -78,7 +80,7 @@ def derive_parameters(a_0):
     # Final step; obtain initial rate of change for the scalar field
     x_i = (((a_0/a_i)**3 * CONSTANT_rho_m0)/(((lambdo**2)/CONSTANT_n) -1))**(0.5)
     
-    return lambdo, phi_c, a_i, phi_i, x_i
+    return lambdo, phi_c, potential_c, a_i, phi_i, x_i
 
 def derive_initial_time_and_Hubble(a_i, lambdo, phi_i, a_0):
     """Derives initial time parameters from global variables and input parameters"""
@@ -93,7 +95,7 @@ def derive_initial_time_and_Hubble(a_i, lambdo, phi_i, a_0):
     
     return H_i
 
-def pre_transition(values, lambdo, phi, x, a_0, a, da, dt):
+def pre_transition(values, lambdo, phi_c, potential_c, phi, x, a_0, a, da, dt):
     """Solves the scalar field equation pre-transition"""
 
     # Calculating energy densities, pressure, the barotropic parameter, and the Hubble parameter from the pre-transition scalar potential
@@ -112,6 +114,8 @@ def pre_transition(values, lambdo, phi, x, a_0, a, da, dt):
     dx = (-3*H*x + (lambdo/CONSTANT_M_pl)*scalar_potential) * dt
     
     # Placing values into arrays so they can be plotted later
+    values.phi.append(phi/phi_c)
+    values.potential.append(scalar_potential/potential_c)
     values.barotropic_parameter.append(barotropic_parameter)
     values.physical_distance_integrand.append(values.physical_distance_integrand[-1] + (da/(H * a**2)))
     values.LCDM_integrand.append(values.LCDM_integrand[-1] + (da/(H_LCDM * a**2)))
@@ -122,7 +126,7 @@ def pre_transition(values, lambdo, phi, x, a_0, a, da, dt):
     
     return values, H, H_LCDM, x, phi
 
-def post_transition(values, lambdo, phi_c, phi, x, a_0, a, da, dt):
+def post_transition(values, lambdo, phi_c, potential_c, phi, x, a_0, a, da, dt):
     """Solves the scalar field equation post-transition for STFQ"""
 
     # Calculating energy densities, pressure, the barotropic parameter, and the Hubble parameter from the post-transition scalar potential
@@ -141,6 +145,8 @@ def post_transition(values, lambdo, phi_c, phi, x, a_0, a, da, dt):
     dx = (-3*H*x - (ETA*lambdo/CONSTANT_M_pl)*scalar_potential) * dt
 
     # Placing values into arrays so they can be plotted later
+    values.phi.append(phi/phi_c)
+    values.potential.append(scalar_potential/potential_c)
     values.barotropic_parameter.append(barotropic_parameter)
     values.physical_distance_integrand.append(values.physical_distance_integrand[-1] + (da/(H * a**2)))
     values.LCDM_integrand.append(values.LCDM_integrand[-1] + (da/(H_LCDM * a**2)))
@@ -214,7 +220,8 @@ def timestep(values, a, da, H, H_LCDM, H_DGP):
     
 def plotGraphs(values):
     """Plots graphs from prior calculated values"""
-
+    mplt.plot(values.phi, values.potential)
+    mplt.show()
     # Barotropic parameter against redshift
     mplt.plot(values.z, values.barotropic_parameter, label = 'STFQ', color = 'r')
     mplt.xlabel('Redshift, z')
@@ -251,6 +258,8 @@ class PlottingArrays:
         self.a = []
         self.z = []
         self.barotropic_parameter = []
+        self.phi = []
+        self.potential = []
         
         self.physical_distance_integrand = [0]
         self.LCDM_integrand = [0]
